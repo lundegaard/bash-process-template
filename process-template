@@ -67,7 +67,7 @@ function replace_placeholders_in_file() {
             replace_placeholder "$1" "$E" "${!E}"
         done
 
-        if [ "$STRICT" == "1" ]; then
+        if [ "$STRICT" == "1" -a -n "$PLACEHOLDER_PREFIX" ]; then
             MISSED_PLACEHOLDERS=$(egrep -n "$PLACEHOLDER_PREFIX" "$FILE")
             if [ $? -eq 0 ]; then
                 echo_err "There are missed placeholders in '$FILE':"
