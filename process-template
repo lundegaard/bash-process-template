@@ -1,0 +1,152 @@
+#!/bin/bash
+
+
+VERBOSE=0
+QUIET=0
+STRICT=0
+TARGET_FILE=""
+TEMPLATE_FILE=""
+PLACEHOLDER_PREFIX="PLACEHOLDER_"
+
+ENV_VARIABLES=$(env | cut -d'=' -f 1 | egrep -v "^_" | sort -r)
+
+
+
+function echo_debug() {
+    if [ "$VERBOSE" == "1" ]; then echo "$@" 1>&2; fi
+}
+
+function echo_err() {
+    if [ "$QUIET" == "0" ]; then echo "$@" 1>&2; fi
+}
+
+usage () {
+    exitcode="$1"
+    cat << USAGE >&2
+Usage:
+  process-template [-f from-file] [-p placeholder-prefix] [-q] [-v] [-s] -t target-file
+    -f | --from from-file      Template file to process. If not given, target is used as input.
+    -t | --target target-file  Target file to write the result.
+    -p | --prefix pattern      Prefix of the placeholders [Default: PLACEHOLDER_]
+    -q | --quiet               Do not output any status messages
+    -v | --verbose             Output detailed info including messages from log file
+    -s | --strict              Exit with exitcode 4 when some placeholders in template are not in env
+USAGE
+    exit "$exitcode"
+}
+
+
+
+# Replace all occurences of placeholder in the file with given value.
+# args:
+# 1 - file to work on
+# 2 - placeholder (no prefix)
+# 3 - value to be placed
+function replace_placeholder() {
+    FILE="$1"
+    PLACEHOLDER="${PLACEHOLDER_PREFIX}${2}"
+    VALUE="$3"
+
+    echo_debug "Looking for placeholder '$PLACEHOLDER' in file '$FILE'"
+
+    egrep -q "$PLACEHOLDER" "$FILE"
+    if [ $? -eq 0 ]; then
+        echo_err "Replacing all placeholders '$PLACEHOLDER' in file '$FILE'"
+        sed -r -i "s|$PLACEHOLDER|$VALUE|g" "$FILE"
+    fi
+}
+
+# Replace all placeholders in the file with values from env.
+# args:
+# 1 - file to work on
+function replace_placeholders_in_file() {
+    FILE="$1"
+
+    if [ -f "$FILE" ]; then
+        for E in $ENV_VARIABLES; do
+            replace_placeholder "$1" "$E" "${!E}"
+        done
+
+        if [ "$STRICT" == "1" -a -n "$PLACEHOLDER_PREFIX" ]; then
+            MISSED_PLACEHOLDERS=$(egrep -n "$PLACEHOLDER_PREFIX" "$FILE")
+            if [ $? -eq 0 ]; then
+                echo_err "There are missed placeholders in '$FILE':"
+                echo_err "$MISSED_PLACEHOLDERS"
+                echo_err "---"
+                exit 4
+            fi
+        fi
+
+    fi
+}
+
+# Replace all placeholders in the template file with values from env and place result in given file.
+# args:
+# 1 - template to process
+# 2 - target file for the result
+function process_template_to_file() {
+    cp "$1" "$2"
+    replace_placeholders_in_file "$2"
+}
+
+
+
+##
+## Main Script
+##
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -v | --verbose)
+            VERBOSE=1
+            shift 1
+            ;;
+        -q | --quiet)
+            QUIET=1
+            shift 1
+            ;;
+        -s | --strict)
+            STRICT=1
+            shift 1
+            ;;
+        -f | --from)
+            TEMPLATE_FILE="$2"
+            if [ "$TEMPLATE_FILE" = "" ]; then break; fi
+            shift 2
+            ;;
+        -t | --target )
+            TARGET_FILE="$2"
+            shift 2
+            ;;
+        -p | --prefix)
+            PLACEHOLDER_PREFIX="$2"
+            shift 2
+            ;;
+        --help)
+            usage 0
+            ;;
+        *)
+            echo_err "Unknown argument: $1"
+            usage 1
+            ;;
+    esac
+done
+
+if [ "$TARGET_FILE" = "" ]; then
+      echo_err "Error: you need to provide a pattern and log file to test."
+      usage 2
+fi
+
+echo_debug "---"
+echo_debug "template file: $TEMPLATE_FILE"
+echo_debug "target file: $TARGET_FILE"
+echo_debug "placeholder prefix: $PLACEHOLDER_PREFIX"
+echo_debug "strict: $STRICT"
+echo_debug "env variables:" $ENV_VARIABLES
+echo_debug "---"
+
+if [ "$TEMPLATE_FILE" = "" -o "$TEMPLATE_FILE" = "$TARGET_FILE" ]; then
+    replace_placeholders_in_file "$TARGET_FILE"
+else
+    process_template_to_file "$TEMPLATE_FILE" "$TARGET_FILE"
+fi
