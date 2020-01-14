@@ -52,7 +52,7 @@ function replace_placeholder() {
     egrep -q "$PLACEHOLDER" "$FILE"
     if [ $? -eq 0 ]; then
         echo_err "Replacing all placeholders '$PLACEHOLDER' in file '$FILE'"
-        sed -i "" "s|$PLACEHOLDER|$VALUE|g" "$FILE"
+        sed -r -i "s|$PLACEHOLDER|$VALUE|g" "$FILE"
     fi
 }
 

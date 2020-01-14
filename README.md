@@ -45,3 +45,15 @@ then resulting `config.properties` file would contain:
 db.user=test
 db.pass=mySuperSecret
 ```
+
+## Tests
+
+The script is tested using suite based on:
+
+* https://github.com/sstephenson/bats/
+* https://github.com/ztombol/bats-support
+* https://github.com/ztombol/bats-assert
+
+All these tools are ready in the `docker.lnd.bz/bats:latest` docker image.
+
+Test suite can be easily run via the `process-template.test.sh` script.
